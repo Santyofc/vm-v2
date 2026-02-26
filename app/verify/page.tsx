@@ -1,114 +1,115 @@
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+// app/verify/page.tsx
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
-export const metadata = {
-  title: "Verificando tu correo... | ZonaSur Tech",
-};
-
-interface VerifyPageProps {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}
-
-export default async function VerifyPage({ searchParams }: VerifyPageProps) {
-  // En Next.js 15, searchParams es una promesa
-  const params = await searchParams;
-  const token = typeof params.token === "string" ? params.token : undefined;
+// En Next.js 15/16, searchParams es asíncrono.
+export default async function VerifyPage(props: {
+  searchParams: Promise<{ token?: string }>;
+}) {
+  const searchParams = await props.searchParams;
+  const token = searchParams.token;
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-vision-main p-4">
-        <div className="bg-vision-glass backdrop-blur-xl border border-white/10 p-8 rounded-[20px] max-w-md w-full text-center shadow-vision-glass">
-          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">
-            ×
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Token Inválido</h1>
-          <p className="text-vision-gray-400 mb-6">El enlace de verificación es incorrecto o no existe.</p>
-          <Link href="/login" className="inline-block bg-vision-brand text-white px-6 py-2.5 rounded-xl font-bold w-full">
-            Ir al Login
-          </Link>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center p-8 bg-white shadow-lg rounded-lg">
+          <h1 className="text-2xl font-bold text-red-600">Error de verificación</h1>
+          <p className="mt-2 text-gray-600">No se proporcionó un token válido en la URL.</p>
         </div>
       </div>
     );
   }
 
   try {
+    // 1. Buscar el token en la tabla correcta
+    const verificationToken = await prisma.verificationToken.findUnique({
+      where: { token },
+    });
+
+    if (!verificationToken) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-center p-8 bg-white shadow-lg rounded-lg">
+            <h1 className="text-2xl font-bold text-red-600">Token Inválido</h1>
+            <p className="mt-2 text-gray-600">El enlace de verificación no existe o ya fue utilizado.</p>
+            <Link href="/login" className="mt-4 inline-block text-blue-600 hover:underline">
+              Volver al login
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Verificar si el token expiró
+    if (verificationToken.expires < new Date()) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-center p-8 bg-white shadow-lg rounded-lg">
+            <h1 className="text-2xl font-bold text-red-600">Token Expirado</h1>
+            <p className="mt-2 text-gray-600">El tiempo para verificar ha expirado. Solicita un nuevo enlace.</p>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Buscar el usuario usando el identifier (email)
     const user = await prisma.user.findUnique({
-      where: { verification_token: token },
+      where: { email: verificationToken.identifier },
     });
 
     if (!user) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-vision-main p-4">
-          <div className="bg-vision-glass backdrop-blur-xl border border-white/10 p-8 rounded-[20px] max-w-md w-full text-center shadow-vision-glass">
-            <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">
-              ×
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Enlace expirado o usado</h1>
-            <p className="text-vision-gray-400 mb-6">Este enlace de verificación ya fue utilizado o ha expirado.</p>
-            <Link href="/login" className="inline-block bg-vision-brand text-white px-6 py-2.5 rounded-xl font-bold w-full">
-              Ir al Login
-            </Link>
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-center p-8 bg-white shadow-lg rounded-lg">
+            <h1 className="text-2xl font-bold text-red-600">Usuario no encontrado</h1>
+            <p className="mt-2 text-gray-600">La cuenta asociada a este enlace ya no existe.</p>
           </div>
         </div>
       );
     }
 
-    if (user.token_expires_at && user.token_expires_at < new Date()) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-vision-main p-4">
-          <div className="bg-vision-glass backdrop-blur-xl border border-white/10 p-8 rounded-[20px] max-w-md w-full text-center shadow-vision-glass">
-            <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">
-              ×
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Enlace expirado</h1>
-            <p className="text-vision-gray-400 mb-6">Tu enlace de verificación ha caducado. Por favor, solicita uno nuevo.</p>
-            <Link href="/login" className="inline-block bg-vision-brand text-white px-6 py-2.5 rounded-xl font-bold w-full">
-              Ir al Login
-            </Link>
-          </div>
-        </div>
-      );
+    // 4. Actualizar usuario y eliminar token (solo si no estaba ya verificado)
+    if (!user.emailVerified) {
+      // Uso $transaction para evitar inconsistencias de datos si falla la eliminación del token
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { email: user.email },
+          data: { emailVerified: new Date() },
+        }),
+        prisma.verificationToken.delete({
+          where: { token },
+        }),
+      ]);
     }
 
-    // El token es válido, verificar usuario
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        is_verified: true,
-        emailVerified: new Date(),
-        verification_token: null, // Invalidar token
-        token_expires_at: null,
-      },
-    });
-
+    // Renderizado de éxito
     return (
-      <div className="min-h-screen flex items-center justify-center bg-vision-main p-4">
-        <div className="bg-vision-glass backdrop-blur-xl border border-white/10 p-8 rounded-[20px] max-w-md w-full text-center shadow-vision-glass">
-          <div className="w-16 h-16 bg-teal-400/10 text-teal-400 border border-teal-400/20 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">
-            ✓
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white shadow-lg rounded-lg text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">¡Cuenta verificada!</h1>
-          <p className="text-vision-gray-400 mb-6">Tu dirección de correo ha sido confirmada correctamente.</p>
-          <Link href="/login" className="inline-block bg-vision-brand text-white px-6 py-2.5 rounded-xl font-bold w-full shadow-vision-glass hover:opacity-90 transition-opacity">
-            Ingresar a tu Cuenta
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">¡Cuenta verificada!</h1>
+          <p className="text-gray-600 mb-6">Tu correo electrónico ha sido verificado correctamente.</p>
+          <Link 
+            href="/login" 
+            className="w-full inline-block bg-blue-600 text-white font-medium py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+          >
+            Continuar al inicio de sesión
           </Link>
         </div>
       </div>
     );
+
   } catch (error) {
-    console.error("Error verifying email:", error);
+    console.error("Error en página de verificación:", error);
     return (
-      <div className="min-h-screen flex items-center justify-center bg-vision-main p-4">
-        <div className="bg-vision-glass backdrop-blur-xl border border-white/10 p-8 rounded-[20px] max-w-md w-full text-center shadow-vision-glass">
-          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">
-            ⚠
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Error del Servidor</h1>
-          <p className="text-vision-gray-400 mb-6">Ocurrió un error inesperado al verificar tu cuenta. Intenta de nuevo.</p>
-          <Link href="/login" className="inline-block bg-vision-brand text-white px-6 py-2.5 rounded-xl font-bold w-full shadow-vision-glass hover:opacity-90 transition-opacity">
-            Volver al Login
-          </Link>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center p-8 bg-white shadow-lg rounded-lg">
+          <h1 className="text-2xl font-bold text-red-600">Error de servidor</h1>
+          <p className="mt-2 text-gray-600">Ocurrió un problema inesperado al verificar la cuenta.</p>
         </div>
       </div>
     );

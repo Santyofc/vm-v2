@@ -16,7 +16,9 @@ services:
       retries: 5
 
   app:
-    build: .
+    build:
+      context: .
+      target: runner
     container_name: citas_app_prod
     restart: unless-stopped
     env_file: .env.production
@@ -32,13 +34,14 @@ services:
       - citas_net
 
   studio:
-    build: .
+    build:
+      context: .
+      target: studio
     container_name: citas_studio_prod
     restart: unless-stopped
     env_file: .env.production
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
-    command: npx prisma studio --browser none --port 5555
     depends_on:
       db:
         condition: service_healthy

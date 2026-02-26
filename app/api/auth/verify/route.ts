@@ -1,83 +1,58 @@
+// app/api/auth/verify/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import {
-  buildRateLimitHeaders,
-  checkRateLimit,
-  getClientIp,
-} from "@/lib/rate-limit";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
-    const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(`auth:verify:${ip}`, {
-      limit: 20,
-      windowMs: 15 * 60 * 1000,
-    });
-
-    if (!rateLimit.success) {
-      return NextResponse.json(
-        { message: "Demasiados intentos. Intenta de nuevo mas tarde." },
-        {
-          status: 429,
-          headers: buildRateLimitHeaders(rateLimit, {
-            limit: 20,
-            windowMs: 15 * 60 * 1000,
-          }),
-        },
-      );
-    }
-
     const { token } = await req.json();
 
-    if (!token || typeof token !== "string") {
+    if (!token) {
       return NextResponse.json(
-        { message: "Token no proporcionado." },
-        { status: 400 },
+        { error: "Token is required" },
+        { status: 400 }
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { verification_token: token },
-      select: {
-        id: true,
-        is_verified: true,
-        token_expires_at: true,
-      },
+    // 1️⃣ Buscar el token de verificación en la tabla correcta
+    const verificationToken = await prisma.verificationToken.findUnique({
+      where: { token },
     });
 
-    if (!user || user.is_verified) {
+    if (!verificationToken) {
       return NextResponse.json(
-        { message: "Token invalido o ya utilizado." },
-        { status: 400 },
+        { error: "Invalid token" },
+        { status: 400 }
       );
     }
 
-    if (user.token_expires_at && new Date() > user.token_expires_at) {
+    if (verificationToken.expires < new Date()) {
       return NextResponse.json(
-        { message: "El token de verificacion ha expirado." },
-        { status: 400 },
+        { error: "Token expired" },
+        { status: 400 }
       );
     }
 
+    // 2️⃣ Actualizar el usuario asociado (usando el identifier como email u otro ID)
     await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        is_verified: true,
+      where: { email: verificationToken.identifier },
+      data: { 
         emailVerified: new Date(),
-        verification_token: null,
-        token_expires_at: null,
+        // is_verified: true, // <- Descomenta esto si usas un booleano aparte de emailVerified
       },
     });
 
-    return NextResponse.json(
-      { message: "Cuenta verificada exitosamente." },
-      { status: 200 },
-    );
+    // 3️⃣ Eliminar el token usado
+    await prisma.verificationToken.delete({
+      where: { token },
+    });
+
+    return NextResponse.json({ success: true });
+
   } catch (error) {
-    console.error("Verification Error:", error);
+    console.error("Verification error:", error);
     return NextResponse.json(
-      { message: "Error interno del servidor." },
-      { status: 500 },
+      { error: "Internal server error" },
+      { status: 500 }
     );
   }
 }

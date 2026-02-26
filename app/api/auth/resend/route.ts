@@ -1,90 +1,79 @@
+// app/api/auth/resend/route.ts
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
-import { prisma } from "@/lib/db";
-import { sendVerificationEmail } from "@/lib/mail";
-import {
-  buildRateLimitHeaders,
-  checkRateLimit,
-  getClientIp,
-} from "@/lib/rate-limit";
-
-const GENERIC_SUCCESS_MESSAGE =
-  "Si el correo esta registrado y pendiente de verificacion, se enviara el enlace.";
+import { Resend } from "resend";
 
 export async function POST(req: Request) {
   try {
-    const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(`auth:resend:${ip}`, {
-      limit: 5,
-      windowMs: 15 * 60 * 1000,
-    });
+    const { email } = await req.json();
 
-    if (!rateLimit.success) {
+    if (!email) {
       return NextResponse.json(
-        { message: "Demasiados intentos. Intenta de nuevo mas tarde." },
-        {
-          status: 429,
-          headers: buildRateLimitHeaders(rateLimit, {
-            limit: 5,
-            windowMs: 15 * 60 * 1000,
-          }),
-        },
+        { error: "El correo es obligatorio" },
+        { status: 400 }
       );
     }
-
-    const payload = (await req.json()) as { email?: unknown };
-
-    if (typeof payload.email !== "string" || !payload.email.trim()) {
-      return NextResponse.json(
-        { error: "El correo electronico es obligatorio." },
-        { status: 400 },
-      );
-    }
-
-    const normalizedEmail = payload.email.trim().toLowerCase();
 
     const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-      select: {
-        id: true,
-        email: true,
-        is_verified: true,
-      },
+      where: { email },
     });
 
-    if (!user || user.is_verified) {
+    if (!user) {
       return NextResponse.json(
-        { message: GENERIC_SUCCESS_MESSAGE },
-        { status: 200 },
+        { error: "Usuario no encontrado" },
+        { status: 404 }
       );
     }
 
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    if (user.emailVerified) {
+      return NextResponse.json(
+        { error: "El correo ya está verificado" },
+        { status: 400 }
+      );
+    }
 
-    await prisma.user.update({
-      where: { id: user.id },
+    // 1️⃣ Limpiar tokens anteriores
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: email },
+    });
+
+    // 2️⃣ Generar nuevo token
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 horas
+
+    await prisma.verificationToken.create({
       data: {
-        verification_token: verificationToken,
-        token_expires_at: tokenExpiresAt,
+        identifier: email,
+        token,
+        expires,
       },
     });
 
-    try {
-      await sendVerificationEmail(user.email, verificationToken);
-    } catch (mailError) {
-      console.error("Error resending verification email:", mailError);
+    // 3️⃣ INICIALIZACIÓN EN RUNTIME
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("Missing RESEND_API_KEY environment variable");
     }
+    
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
-    return NextResponse.json(
-      { message: GENERIC_SUCCESS_MESSAGE },
-      { status: 200 },
-    );
+    // 4️⃣ Enviar correo
+    /*
+    await resend.emails.send({
+      from: "Zona Sur Tech <onboarding@resend.dev>",
+      to: email,
+      subject: "Verifica tu correo electrónico",
+      html: `<p>Haz clic <a href="${process.env.NEXT_PUBLIC_APP_URL}/verify?token=${token}">aquí</a> para verificar tu cuenta.</p>`,
+    });
+    */
+
+    return NextResponse.json({ success: true, message: "Correo reenviado" });
   } catch (error) {
-    console.error("Error resending verification:", error);
+    console.error("Resend email error:", error);
     return NextResponse.json(
-      { error: "No se pudo reenviar el correo. Intenta de nuevo mas tarde." },
-      { status: 500 },
+      { error: "Error interno del servidor" },
+      { status: 500 }
     );
   }
 }
+

@@ -7,22 +7,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//
 // ─────────────────────────────────────────────
-// Enums
+// ENUMS
 // ─────────────────────────────────────────────
+//
 
 enum Role {
-  USER
-  TENANT_ADMIN
   SUPERADMIN
+  ADMIN
+  STAFF
 }
 
 enum SubscriptionStatus {
+  TRIALING
   ACTIVE
   PAST_DUE
   CANCELED
   UNPAID
-  TRIALING
 }
 
 enum AppointmentStatus {
@@ -32,45 +34,59 @@ enum AppointmentStatus {
   COMPLETED
 }
 
+//
 // ─────────────────────────────────────────────
-// Core models
+// CORE MULTI-TENANT MODELS
 // ─────────────────────────────────────────────
+//
 
 model Tenant {
-  id           String        @id @default(cuid())
-  name         String
-  slug         String?       @unique
-  subdomain    String?       @unique
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  subdomain String?  @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   users        User[]
   subscription Subscription?
   clients      Client[]
   services     Service[]
   appointments Appointment[]
+
+  @@index([slug])
+  @@index([subdomain])
 }
 
 model User {
-  id                 String    @id @default(cuid())
-  name               String?
-  email              String    @unique
-  emailVerified      DateTime?
-  image              String?
-  password           String?
-  role               Role      @default(USER)
-  is_verified        Boolean   @default(false)
-  verification_token String?   @unique
-  token_expires_at   DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          Role      @default(STAFF)
 
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   accounts Account[]
   sessions Session[]
+
+  resetTokens PasswordResetToken[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
 }
+
+//
+// ─────────────────────────────────────────────
+// NEXTAUTH COMPATIBILITY
+// ─────────────────────────────────────────────
+//
 
 model Account {
   id                String  @id @default(cuid())
@@ -96,7 +112,8 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -107,86 +124,131 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+//
 // ─────────────────────────────────────────────
-// Business models
+// PASSWORD RESET (ARCHITECTURE CORRECTA)
 // ─────────────────────────────────────────────
+//
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token     String   @unique
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+//
+// ─────────────────────────────────────────────
+// SUBSCRIPTION (STRIPE READY)
+// ─────────────────────────────────────────────
+//
 
 model Subscription {
   id                   String             @id @default(cuid())
   tenantId             String             @unique
   tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   stripeCustomerId     String?            @unique
   stripeSubscriptionId String?            @unique
   status               SubscriptionStatus @default(TRIALING)
   planId               String?
+
   currentPeriodStart   DateTime?
   currentPeriodEnd     DateTime?
+
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+
+  @@index([status])
 }
+
+//
+// ─────────────────────────────────────────────
+// BUSINESS MODELS
+// ─────────────────────────────────────────────
+//
 
 model Client {
   id        String   @id @default(cuid())
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   name      String
   email     String?
   phone     String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   appointments Appointment[]
+
+  @@index([tenantId])
 }
 
 model Service {
   id          String   @id @default(cuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   name        String
   description String?
   price       Float    @default(0)
-  duration    Int      @default(30) // minutes
+  duration    Int      @default(30)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   appointments Appointment[]
+
+  @@index([tenantId])
 }
 
 model Appointment {
   id        String            @id @default(cuid())
   tenantId  String
   tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   clientId  String
   client    Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
   serviceId String
   service   Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
   date      DateTime
   status    AppointmentStatus @default(PENDING)
   notes     String?
+
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+
+  @@index([tenantId])
+  @@index([date])
 }
 
+//
 // ─────────────────────────────────────────────
-// Infrastructure models
+// INFRASTRUCTURE MODELS
 // ─────────────────────────────────────────────
+//
 
-/// Persistent rate limiting — survives container restarts and works across
-/// multiple replicas sharing the same PostgreSQL instance.
 model RateLimitEntry {
-  key     String   @id        // e.g. "auth-login:192.168.1.1"
+  key     String   @id
   count   Int      @default(1)
   resetAt DateTime
 
   @@index([resetAt])
 }
 
-/// Idempotency store for Stripe webhooks.
-/// Guarantees each Stripe event is processed exactly once even when
-/// Stripe retries due to network errors or container restarts.
 model WebhookEvent {
-  id          String   @id           // Stripe event ID (evt_...)
-  type        String                  // e.g. "checkout.session.completed"
+  id          String   @id
+  type        String
   processedAt DateTime @default(now())
 
   @@index([processedAt])

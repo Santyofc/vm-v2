@@ -43,7 +43,7 @@ async function requireTenantAdmin(): Promise<AuthenticatedUser> {
     throw new Error("No tenant associated with this account");
   }
 
-  if (user.role !== "TENANT_ADMIN" && user.role !== "SUPERADMIN") {
+if (user.role !== "ADMIN" && user.role !== "SUPERADMIN") {
     throw new Error("Forbidden: insufficient role");
   }
 

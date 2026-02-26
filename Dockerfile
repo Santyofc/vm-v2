@@ -24,15 +24,14 @@ RUN rm -f .env .env.local .env.production .env.development
 RUN npx prisma generate
 
 # 3. Compilar el SEED (TS -> JS) para producción
-# Usamos esbuild para crear un bundle autocontenido del seed
-RUN npx esbuild prisma/seed.ts --bundle --platform=node --outfile=prisma/seed.js
+RUN npx esbuild prisma/seed.ts --bundle --platform=node --packages=external --outfile=prisma/seed.js
 
 # 4. Build de Next.js (Standalone)
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# ── STAGE 3: RUNNER ───────────────────────────────────────
+# ── STAGE 3: RUNNER (Next.js App) ─────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -56,7 +55,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modul
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 
-# Eliminar cualquier rastro de .env
+# Eliminar cualquier rastro de variables locales
 RUN rm -f .env .env.local .env.production
 
 USER nextjs
@@ -64,3 +63,20 @@ USER nextjs
 EXPOSE 3000
 
 CMD ["node", "server.js"]
+
+# ── STAGE 4: STUDIO (Prisma Admin) ────────────────────────
+FROM node:20-alpine AS studio
+WORKDIR /app
+
+RUN apk add --no-cache openssl
+
+# El studio necesita el package.json y los binarios completos para que npx funcione
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma ./prisma
+
+ENV NODE_ENV=production
+EXPOSE 5555
+
+# Exponer en 0.0.0.0 es vital en Docker
+CMD ["npx", "prisma", "studio", "--browser", "none", "--port", "5555", "--hostname", "0.0.0.0"]
