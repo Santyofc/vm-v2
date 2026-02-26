@@ -1,0 +1,26 @@
+# Dependencias
+node_modules/
+.npm
+/dist
+/build
+
+# Next.js
+.next/
+out/
+
+# Entorno y Secretos (CRÍTICO)
+.env
+*.env.local
+*.env.production
+*.env.development
+.htpasswd
+
+# Base de Datos y Backups
+backups/*.sql.gz
+backups/*.log
+/postgres_data
+
+# Logs y Varios
+*.log
+npm-debug.log*
+.DS_Store

@@ -1,0 +1,55 @@
+name: citas-gestion-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: citas_db_prod
+    restart: unless-stopped
+    env_file: .env.production
+    volumes:
+      - citas_db_prod_data:/var/lib/postgresql/data
+    networks:
+      - citas_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+
+  app:
+    build: .
+    container_name: citas_app_prod
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - citas_net
+
+  studio:
+    build: .
+    container_name: citas_studio_prod
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+    command: npx prisma studio --browser none --port 5555
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5555:5555"
+    networks:
+      - citas_net
+
+networks:
+  citas_net:
+    driver: bridge
+
+volumes:
+  citas_db_prod_data:

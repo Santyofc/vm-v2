@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-vision-main: #0F1535;
+  --color-vision-blue: #0075FF;
+  --color-vision-purple: #7756FC;
+  --color-vision-glass: linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.49) 76.65%);
+  --shadow-vision: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+@layer base {
+  body {
+    background: var(--color-vision-main);
+    background-image: radial-gradient(circle at top right, #1a235a 0%, #0F1535 100%);
+    background-attachment: fixed;
+    color: white;
+    @apply antialiased min-h-screen;
+  }
+}
+
+@layer components {
+  .vision-card {
+    background: var(--color-vision-glass);
+    backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-vision);
+    border-radius: 2.5rem;
+    @apply transition-all duration-500 ease-out;
+  }
+
+  .vision-card:hover {
+    @apply -translate-y-2 border-white/20;
+    box-shadow: 0 15px 40px rgba(0, 117, 255, 0.15);
+  }
+
+  .btn-vision {
+    background: linear-gradient(135deg, var(--color-vision-blue) 0%, var(--color-vision-purple) 100%);
+    @apply font-black tracking-tight px-8 py-4 rounded-2xl shadow-lg transition-all active:scale-95 hover:opacity-90;
+    box-shadow: 0 10px 20px rgba(0, 117, 255, 0.2);
+  }
+
+  table { @apply w-full border-collapse text-left; }
+  th { @apply text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] p-6 border-b border-white/5; }
+  td { @apply p-6 border-b border-white/5 text-sm font-medium transition-colors; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); filter: blur(10px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+.animate-cascade > * {
+  opacity: 0;
+  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.animate-cascade > *:nth-child(1) { animation-delay: 0.1s; }
+.animate-cascade > *:nth-child(2) { animation-delay: 0.2s; }
+.animate-cascade > *:nth-child(3) { animation-delay: 0.3s; }
