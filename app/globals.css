@@ -1,16 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --color-vision-main: #0F1535;
-  --color-vision-blue: #0075FF;
-  --color-vision-purple: #7756FC;
-  --color-vision-glass: linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.49) 76.65%);
-  --shadow-vision: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  /* ── Colores base del sistema ── */
+  --color-vision-main:     #0F1535;
+  --color-vision-card:     rgba(17, 28, 68, 0.7);
+  --color-vision-blue:     #0075FF;
+  --color-vision-purple:   #7756FC;
+  --color-vision-teal:     #01B574;
+  --color-vision-red:      #EE5D50;
+  --color-vision-gray-400: #A0AEC0;
+  --color-vision-gray-500: #718096;
+
+  /* ── Tipografía ── */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* ── Sombras ── */
+  --shadow-vision-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 @layer base {
   body {
-    background: var(--color-vision-main);
+    background-color: #0F1535;
     background-image: radial-gradient(circle at top right, #1a235a 0%, #0F1535 100%);
     background-attachment: fixed;
     color: white;
@@ -19,11 +30,12 @@
 }
 
 @layer components {
+  /* Glassmorphism card */
   .vision-card {
-    background: var(--color-vision-glass);
+    background: linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.49) 76.65%);
     backdrop-filter: blur(25px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: var(--shadow-vision);
+    box-shadow: var(--shadow-vision-glass);
     border-radius: 2.5rem;
     @apply transition-all duration-500 ease-out;
   }
@@ -33,20 +45,49 @@
     box-shadow: 0 15px 40px rgba(0, 117, 255, 0.15);
   }
 
+  /* Botón principal — gradient brand */
   .btn-vision {
-    background: linear-gradient(135deg, var(--color-vision-blue) 0%, var(--color-vision-purple) 100%);
-    @apply font-black tracking-tight px-8 py-4 rounded-2xl shadow-lg transition-all active:scale-95 hover:opacity-90;
+    background: linear-gradient(135deg, #0075FF 0%, #7756FC 100%);
     box-shadow: 0 10px 20px rgba(0, 117, 255, 0.2);
+    @apply font-black tracking-tight px-8 py-4 rounded-2xl transition-all active:scale-95 hover:opacity-90;
   }
 
+  /* Glass card compacta (dashboard sidebar) */
+  .glass-card {
+    background: linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.49) 76.65%);
+    backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-vision-glass);
+    @apply rounded-[2rem];
+  }
+
+  /* Sidebar item activo */
+  .sidebar-active {
+    background: linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.69) 76.65%);
+  }
+
+  /* Input fields */
+  .vision-input {
+    background: #0F1535;
+    @apply border border-white/10 rounded-2xl px-4 py-4 text-sm focus:border-vision-blue outline-none transition-all placeholder:text-vision-gray-400;
+  }
+
+  /* Botón brand (alias) */
+  .btn-brand {
+    background: linear-gradient(135deg, #0075FF 0%, #7756FC 100%);
+    @apply text-white font-bold py-4 rounded-2xl shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2;
+  }
+
+  /* Tablas */
   table { @apply w-full border-collapse text-left; }
-  th { @apply text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] p-6 border-b border-white/5; }
-  td { @apply p-6 border-b border-white/5 text-sm font-medium transition-colors; }
+  th    { @apply text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] p-6 border-b border-white/5; }
+  td    { @apply p-6 border-b border-white/5 text-sm font-medium transition-colors; }
 }
 
+/* ── Animaciones ── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(30px); filter: blur(10px); }
-  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0);   }
 }
 
 .animate-cascade > * {
@@ -57,3 +98,7 @@
 .animate-cascade > *:nth-child(1) { animation-delay: 0.1s; }
 .animate-cascade > *:nth-child(2) { animation-delay: 0.2s; }
 .animate-cascade > *:nth-child(3) { animation-delay: 0.3s; }
+
+/* ── Scrollbar oculto ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

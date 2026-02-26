@@ -8,7 +8,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen overflow-hidden bg-vision-main">
+    <div className="flex h-screen overflow-hidden bg-[#0F1535]">
       {/* Sidebar lateral fijo */}
       <Sidebar />
 

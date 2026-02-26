@@ -22,7 +22,7 @@ export function Navbar() {
     <nav
       className={`sticky top-4 z-40 mx-4 flex items-center justify-between rounded-2xl px-6 py-3 transition-all duration-300 ${
         scrolled
-          ? "bg-vision-glass backdrop-blur-xl border border-white/10 shadow-vision-glass"
+          ? "glass-card"
           : "bg-transparent"
       }`}
     >
@@ -52,9 +52,9 @@ export function Navbar() {
         </button>
         <button className="text-vision-gray-400 hover:text-white transition-colors relative">
           🔔
-          <span className="absolute top-0 right-0 w-2 h-2 bg-vision-red rounded-full"></span>
+          <span className="absolute top-0 right-0 w-2 h-2 bg-[#EE5D50] rounded-full"></span>
         </button>
-        <div className="w-8 h-8 rounded-full bg-vision-brand flex items-center justify-center text-sm font-bold border border-white/20">
+        <div style={{ background: 'linear-gradient(135deg, #0075FF 0%, #7756FC 100%)' }} className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border border-white/20">
           A
         </div>
       </div>

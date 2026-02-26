@@ -33,7 +33,8 @@ export function Sidebar() {
 
       {/* Mobile Toggle Button */}
       <button 
-        className="lg:hidden fixed bottom-6 right-6 z-50 p-4 rounded-full bg-vision-brand text-white shadow-vision-glass"
+        style={{ background: 'linear-gradient(135deg, #0075FF 0%, #7756FC 100%)', boxShadow: '0 8px 32px 0 rgba(0,0,0,0.37)' }}
+        className="lg:hidden fixed bottom-6 right-6 z-50 p-4 rounded-full text-white"
         onClick={() => setIsOpen(!isOpen)}
       >
         {isOpen ? "✕" : "☰"}
@@ -43,8 +44,8 @@ export function Sidebar() {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 max-w-full transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:block",
-          "bg-vision-main lg:bg-transparent lg:bg-vision-glass backdrop-blur-2xl border-r border-white/10 lg:border-none",
-          "m-0 lg:m-4 lg:rounded-2xl shadow-vision-glass",
+          "bg-[#0F1535] lg:glass-card backdrop-blur-2xl border-r border-white/10 lg:border-none",
+          "m-0 lg:m-4 lg:rounded-2xl",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -66,14 +67,14 @@ export function Sidebar() {
                   className={cn(
                     "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200",
                     isActive 
-                      ? "bg-vision-active text-white shadow-md border border-white/5" 
+                      ? "sidebar-active text-white shadow-md border border-white/5" 
                       : "text-vision-gray-400 hover:bg-white/5 hover:text-white"
                   )}
                   onClick={() => setIsOpen(false)}
                 >
                   <div className={cn(
                     "flex items-center justify-center w-8 h-8 rounded-lg",
-                    isActive ? "bg-vision-brand text-white" : "bg-white/10"
+                    isActive ? "text-white" : "bg-white/10"
                   )}>
                     {item.icon}
                   </div>

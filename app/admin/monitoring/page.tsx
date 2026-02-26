@@ -3,7 +3,6 @@ import { getSystemMetrics } from "@/actions/monitoring";
 import { PerformanceChart } from "@/components/admin/monitoring-charts";
 import { Activity, Database, Cpu, HardDrive } from "lucide-react";
 
-export const dynamic = "force-dynamic"; // Para que siempre pida datos frescos
 
 export default async function MonitoringPage() {
   const metrics = await getSystemMetrics();
