@@ -1,7 +1,10 @@
 import { Sidebar } from "@/components/admin/sidebar";
 import { Header } from "@/components/admin/header";
+import { requireSuperAdmin } from "@/lib/dal";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  await requireSuperAdmin();
+
   return (
     <div className="flex h-screen overflow-hidden bg-vision-main">
       <Sidebar />

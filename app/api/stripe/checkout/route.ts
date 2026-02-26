@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getStripeSession } from "@/lib/stripe";
 import { isBillingEnabledServer } from "@/lib/billing";
+import { requireTenantAccess } from "@/lib/dal";
 
 function getAllowedPriceIds(): Set<string> {
   const envPriceIds = (process.env.STRIPE_ALLOWED_PRICE_IDS ?? "")
@@ -22,10 +23,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const { userId, tenantId } = await requireTenantAccess();
 
     const payload = (await req.json()) as { priceId?: unknown };
     const priceId =
@@ -40,7 +38,6 @@ export async function POST(req: Request) {
 
     const allowedPriceIds = getAllowedPriceIds();
     if (allowedPriceIds.size === 0) {
-      console.error("STRIPE_ALLOWED_PRICE_IDS is empty or not configured");
       return NextResponse.json(
         { error: "Configuracion de precios no disponible" },
         { status: 500 },
@@ -55,7 +52,7 @@ export async function POST(req: Request) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId, tenantId: tenantId ?? undefined }, // Guard injected
       select: { email: true, tenantId: true },
     });
 
@@ -75,7 +72,7 @@ export async function POST(req: Request) {
     // would create a customer with no email and break billing flows silently.
     if (!user.email) {
       console.error(
-        `User ${session.user.id} has no email — cannot create Stripe session`,
+        `User ${userId} has no email — cannot create Stripe session`,
       );
       return NextResponse.json(
         { error: "La cuenta no tiene un email valido para facturacion" },

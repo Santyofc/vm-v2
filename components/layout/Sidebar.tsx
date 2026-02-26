@@ -11,10 +11,11 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 const NAVIGATION = [
-  { name: "Dashboard", href: "/tenant/dashboard", icon: "📊" },
-  { name: "Appointments", href: "/tenant/appointments", icon: "📅" },
-  { name: "Clients", href: "/tenant/clients", icon: "👥" },
-  { name: "Billing", href: "/tenant/billing", icon: "💳" },
+  { name: "Dashboard",    href: "/dashboard",    icon: "📊" },
+  { name: "Calendario",   href: "/calendario",   icon: "📅" },
+  { name: "Clientes",     href: "/clientes",     icon: "👥" },
+  { name: "Servicios",    href: "/servicios",    icon: "🛠️" },
+  { name: "Configuración",href: "/configuracion",icon: "⚙️" },
 ];
 
 export function Sidebar() {

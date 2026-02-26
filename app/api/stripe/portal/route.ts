@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { isBillingEnabledServer } from "@/lib/billing";
 import { getStripeClient } from "@/lib/stripe";
+import { requireTenantAccess } from "@/lib/dal";
 
 function getTenantAppUrl() {
   return (
@@ -30,18 +31,13 @@ export async function POST() {
       );
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const { userId, tenantId } = await requireTenantAccess();
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId, tenantId: tenantId ?? undefined },
       include: {
         tenant: {
-          include: {
-            subscription: true,
-          },
+          include: { subscription: true },
         },
       },
     });

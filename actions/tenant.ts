@@ -3,56 +3,7 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 
-// ─────────────────────────────────────────────
-// Internal auth helper — single source of truth
-// ─────────────────────────────────────────────
-
-type AuthenticatedUser = {
-  tenantId: string;
-  userId: string;
-  role: string;
-};
-
-/**
- * Validates the current session and confirms the caller is either a
- * TENANT_ADMIN or a SUPERADMIN with an associated tenant.
- * Throws on any failure — call sites never see a partial state.
- */
-async function requireTenantAdmin(): Promise<AuthenticatedUser> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    throw new Error("Unauthenticated: no active session");
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      role: true,
-      tenantId: true,
-      tenant: {
-        select: {
-          subscription: true,
-        },
-      },
-    },
-  });
-
-  if (!user?.tenantId) {
-    throw new Error("No tenant associated with this account");
-  }
-
-if (user.role !== "ADMIN" && user.role !== "SUPERADMIN") {
-    throw new Error("Forbidden: insufficient role");
-  }
-
-  return {
-    tenantId: user.tenantId,
-    userId: user.id,
-    role: user.role,
-  };
-}
+import { requireTenantAccess } from "@/lib/dal";
 
 // ─────────────────────────────────────────────
 // Exported server actions
@@ -60,7 +11,7 @@ if (user.role !== "ADMIN" && user.role !== "SUPERADMIN") {
 
 export async function getTenantConfig() {
   // Single auth() call — no redundant session lookup
-  const { tenantId, userId } = await requireTenantAdmin();
+  const { tenantId, userId } = await requireTenantAccess();
 
   return prisma.user.findFirst({
     where: { id: userId, tenantId },
@@ -84,7 +35,7 @@ export async function getTenantConfig() {
 }
 
 export async function getDashboardMetrics() {
-  const { tenantId } = await requireTenantAdmin();
+  const { tenantId } = await requireTenantAccess();
 
   const now = new Date();
   const startOfDay = new Date(now);
@@ -160,7 +111,7 @@ export async function getDashboardMetrics() {
 }
 
 export async function getUpcomingAppointments() {
-  const { tenantId } = await requireTenantAdmin();
+  const { tenantId } = await requireTenantAccess();
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -178,7 +129,9 @@ export async function createAppointment(
   serviceId: string,
   date: Date,
 ) {
-  const { tenantId } = await requireTenantAdmin();
+  const { tenantId } = await requireTenantAccess();
+
+  if (!tenantId) throw new Error("Tenant context not found.");
 
   if (!clientId || !serviceId || Number.isNaN(new Date(date).getTime())) {
     throw new Error("Invalid appointment data");
@@ -205,15 +158,26 @@ export async function createAppointment(
 }
 
 export async function getClients() {
-  const { tenantId } = await requireTenantAdmin();
+  const { tenantId } = await requireTenantAccess();
   return prisma.client.findMany({
     where: { tenantId },
     orderBy: { createdAt: "desc" },
   });
 }
 
+export async function createClient(data: any) {
+  const session = await requireTenantAccess();
+
+  return prisma.client.create({
+    data: {
+      ...data,
+      tenantId: session.tenantId!,
+    },
+  });
+}
+
 export async function getServices() {
-  const { tenantId } = await requireTenantAdmin();
+  const { tenantId } = await requireTenantAccess();
   return prisma.service.findMany({
     where: { tenantId },
     orderBy: { createdAt: "desc" },

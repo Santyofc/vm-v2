@@ -63,20 +63,3 @@ USER nextjs
 EXPOSE 3000
 
 CMD ["node", "server.js"]
-
-# ── STAGE 4: STUDIO (Prisma Admin) ────────────────────────
-FROM node:20-alpine AS studio
-WORKDIR /app
-
-RUN apk add --no-cache openssl
-
-# El studio necesita el package.json y los binarios completos para que npx funcione
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-
-ENV NODE_ENV=production
-EXPOSE 5555
-
-# Exponer en 0.0.0.0 es vital en Docker
-CMD ["npx", "prisma", "studio", "--browser", "none", "--port", "5555", "--hostname", "0.0.0.0"]

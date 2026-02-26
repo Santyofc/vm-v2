@@ -2,18 +2,9 @@
 
 import { exec } from "child_process";
 import { promisify } from "util";
-import { auth } from "@/auth";
-
 const execPromise = promisify(exec);
 
-async function requireSuperAdmin() {
-  const session = await auth();
-  const role = (session?.user as any)?.role;
-  if (!session?.user || role !== "SUPERADMIN") {
-    throw new Error("Unauthorized");
-  }
-}
-
+import { requireSuperAdmin } from "@/lib/dal";
 export async function restartDockerServices() {
   await requireSuperAdmin();
 

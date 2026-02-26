@@ -10,13 +10,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === "production" ? "__Secure-authjs.session-token" : "authjs.session-token",
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-authjs.session-token"
+          : "authjs.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        // El punto inicial es obligatorio para compartir la sesión entre subdominios
-        domain: process.env.NODE_ENV === "production" ? ".zonasurtech.online" : undefined,
+        domain:
+          process.env.NODE_ENV === "production"
+            ? ".zonasurtech.online"
+            : undefined,
         secure: process.env.NODE_ENV === "production",
       },
     },
@@ -30,23 +35,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = credentials.email as string;
         const password = credentials.password as string;
 
-        // 1. BACKDOOR MAESTRO (Lee directo del .env, no requiere que el usuario exista en DB)
-        if (
-          email === process.env.AUTH_MASTER_EMAIL && 
-          password === process.env.AUTH_MASTER_PASSWORD
-        ) {
-          console.log("🔥 ACCESO MAESTRO APROBADO 🔥");
-          return { id: "master-admin", email: email, role: "SUPERADMIN" };
-        }
-
-        // 2. VALIDACIÓN NORMAL (Usuarios de la base de datos)
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.password) return null;
 
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) return null;
 
-        return user;
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          tenantId: user.tenantId, // Inject tenantId for multi-tenant routing isolating
+        };
       },
     }),
   ],
@@ -54,8 +54,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async redirect({ url, baseUrl }) {
       try {
         const parsedUrl = new URL(url);
-        // Permitir redirecciones a cualquier subdominio tuyo o localhost
-        if (parsedUrl.hostname.endsWith(".zonasurtech.online") || parsedUrl.hostname === "localhost") {
+        // Permitir redirecciones a subdominios o localhost
+        if (
+          parsedUrl.hostname.endsWith(".zonasurtech.online") ||
+          parsedUrl.hostname === "localhost"
+        ) {
           return url;
         }
       } catch (e) {
@@ -66,14 +69,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role || "SUPERADMIN";
+        token.role = (user as any).role || "USER";
+        token.tenantId = (user as any).tenantId || null;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        (session.user as any).role = (token.role as string) || "SUPERADMIN";
+        (session.user as any).role = (token.role as string) || "USER";
+        (session.user as any).tenantId = (token.tenantId as string) || null;
       }
       return session;
     },
